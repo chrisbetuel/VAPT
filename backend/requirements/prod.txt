@@ -1,0 +1,5 @@
+-r base.txt
+
+# Production extras
+sentry-sdk[fastapi]==1.39.0
+python-json-logger==2.0.7

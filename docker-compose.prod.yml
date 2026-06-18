@@ -1,0 +1,153 @@
+version: "3.9"
+
+services:
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+
+  frontend:
+    build:
+      target: production
+    command: nginx -g 'daemon off;'
+    restart: always
+
+  backend:
+    build:
+      target: production
+    command: gunicorn app.main:app --bind 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker --workers 4 --max-requests 1000 --max-requests-jitter 50
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "1"
+          memory: "1G"
+
+  celery_worker:
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: "4"
+          memory: "4G"
+        reservations:
+          cpus: "2"
+          memory: "2G"
+    restart: always
+
+  celery_beat:
+    restart: always
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: "8G"
+        reservations:
+          cpus: "2"
+          memory: "4G"
+    restart: always
+
+  prometheus:
+    restart: always
+
+  grafana:
+    restart: always
+
+  # ============================================================================
+  # OWASP ZAP - Web Application Scanner (Production)
+  # ============================================================================
+  zap:
+    image: zaproxy/zap-stable:latest
+    container_name: vapt-zap
+    user: zap
+    command: >
+      zap.sh -daemon -host 0.0.0.0 -port ${SCANNER_ZAP_PORT:-8090} -config api.key=${SCANNER_ZAP_API_KEY:-change-me-zap-api-key} -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true -config database.recoverylog=false
+    volumes:
+      - zap_data:/home/zap/.ZAP
+    ports:
+      - "8090:8090"
+    networks:
+      - vapt-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # ============================================================================
+  # Flask Webhook Service - External Integration Gateway
+  # ============================================================================
+  flask_webhooks:
+    build:
+      context: ./backend
+      dockerfile: flask_app/Dockerfile
+    container_name: vapt-flask-webhooks
+    env_file:
+      - .env
+      - .env.${ENVIRONMENT:-production}
+    environment:
+      - FLASK_PORT=5000
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-change-me-webhook-secret}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+    ports:
+      - "5000:5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vapt-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # Production-only services
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: vapt-node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+    ports:
+      - "9100:9100"
+    networks:
+      - vapt-network
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: vapt-cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8088:8080"
+    networks:
+      - vapt-network
+    restart: unless-stopped
+
+volumes:
+  zap_data:
+    driver: local
+
+networks:
+  vapt-network:
+    name: vapt-network
+    driver: bridge

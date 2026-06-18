@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  labels:
+    app: vapt
+    component: celery-worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vapt
+      component: celery-worker
+  template:
+    metadata:
+      labels:
+        app: vapt
+        component: celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: vapt-backend:latest
+          imagePullPolicy: Always
+          command:
+            - celery
+            - -A
+            - vapt.tasks
+            - worker
+            - --loglevel=info
+          envFrom:
+            - configMapRef:
+                name: vapt-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: redis-url
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: secret-key
+          resources:
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+            requests:
+              memory: "1Gi"
+              cpu: "1"

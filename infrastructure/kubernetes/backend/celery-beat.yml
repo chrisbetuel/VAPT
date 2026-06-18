@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  labels:
+    app: vapt
+    component: celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vapt
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: vapt
+        component: celery-beat
+    spec:
+      containers:
+        - name: celery-beat
+          image: vapt-backend:latest
+          imagePullPolicy: Always
+          command:
+            - celery
+            - -A
+            - vapt.tasks
+            - beat
+            - --loglevel=info
+          envFrom:
+            - configMapRef:
+                name: vapt-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: redis-url
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"

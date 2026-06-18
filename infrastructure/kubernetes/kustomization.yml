@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: vapt-platform
+
+namespace: vapt
+
+resources:
+  - configmap.yml
+  - frontend/deployment.yml
+  - backend/deployment.yml
+  - backend/celery-worker.yml
+  - backend/celery-beat.yml
+  - scanner/scanner-pool.yml
+  - monitoring/prometheus.yml
+  - monitoring/grafana.yml
+  - storage/postgres.yml
+  - storage/redis.yml
+  - storage/minio.yml
+  - storage/elasticsearch.yml
+
+commonLabels:
+  app: vapt
+  environment: production
+
+images:
+  - name: vapt-frontend
+    newTag: latest
+  - name: vapt-backend
+    newTag: latest
+  - name: vapt-scanner
+    newTag: latest

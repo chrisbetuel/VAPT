@@ -1,0 +1,102 @@
+{
+  "title": "VAPT Overview",
+  "tags": ["vapt"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scan Status",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "count(scan_status{status=\"completed\"})",
+          "legendFormat": "Completed"
+        },
+        {
+          "expr": "count(scan_status{status=\"running\"})",
+          "legendFormat": "Running"
+        },
+        {
+          "expr": "count(scan_status{status=\"failed\"})",
+          "legendFormat": "Failed"
+        },
+        {
+          "expr": "count(scan_status{status=\"pending\"})",
+          "legendFormat": "Pending"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Active Scans",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 3, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "count(scan_status{status=\"running\"})"
+        }
+      ],
+      "max": 50
+    },
+    {
+      "id": 3,
+      "title": "Vulnerability Severity",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 6, "x": 9, "y": 0 },
+      "targets": [
+        {
+          "expr": "count(vulnerability_severity{severity=\"critical\"})",
+          "legendFormat": "Critical"
+        },
+        {
+          "expr": "count(vulnerability_severity{severity=\"high\"})",
+          "legendFormat": "High"
+        },
+        {
+          "expr": "count(vulnerability_severity{severity=\"medium\"})",
+          "legendFormat": "Medium"
+        },
+        {
+          "expr": "count(vulnerability_severity{severity=\"low\"})",
+          "legendFormat": "Low"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Scan Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "avg(scan_duration_seconds) by (scan_type)",
+          "legendFormat": "{{ scan_type }}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Success Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(scan_success_total[24h])) / sum(rate(scan_attempts_total[24h])) * 100"
+        }
+      ],
+      "format": "percent"
+    },
+    {
+      "id": 6,
+      "title": "Recent Alerts",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 3, "y": 16 },
+      "targets": [
+        {
+          "expr": "ALERTS"
+        }
+      ]
+    }
+  ]
+}
