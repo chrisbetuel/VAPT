@@ -47,3 +47,9 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": settings.APP_VERSION}
+
+@app.get("/metrics")
+async def metrics():
+    from prometheus_client import generate_latest, REGISTRY
+    from starlette.responses import Response
+    return Response(content=generate_latest(REGISTRY).decode("utf-8"), media_type="text/plain; charset=utf-8")

@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import { Search, Menu, LogOut, User } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useUIStore } from '@/stores/uiStore'
 
 interface TopbarProps {
-  title: string
-  onMenuToggle: () => void
+  title?: string
+  onMenuToggle?: () => void
 }
 
-export default function Topbar({ title, onMenuToggle }: TopbarProps) {
+export default function Topbar({ title = 'Dashboard', onMenuToggle }: TopbarProps) {
   const { user, logout } = useAuthStore()
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6">
       <div className="flex items-center gap-4">
         <button
-          onClick={onMenuToggle}
+          onClick={onMenuToggle ?? toggleSidebar}
           className="rounded-md p-1.5 hover:bg-muted lg:hidden"
         >
           <Menu className="h-5 w-5" />

@@ -25,3 +25,11 @@ class ReportResponse(BaseModel):
     completed_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class ReportListResponse(BaseModel):
+    items: list[ReportResponse]
+    total: int
+    page: int
+    size: int
+    pages: int

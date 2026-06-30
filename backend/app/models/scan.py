@@ -50,7 +50,11 @@ class Scan(Base):
     target = relationship("Target", back_populates="scans")
     created_by_user = relationship("User", back_populates="scans")
     vulnerabilities = relationship("Vulnerability", back_populates="scan", cascade="all, delete-orphan", lazy="selectin")
-    scan_logs = relationship("ScanLog", back_populates="scan", cascade="all, delete-orphan")
+    scan_logs = relationship("ScanLog", back_populates="scan", cascade="all, delete-orphan", lazy="selectin")
+
+    @property
+    def logs(self):
+        return self.scan_logs
 
 
 class VulnerabilitySeverity(str, enum.Enum):

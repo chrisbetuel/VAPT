@@ -22,7 +22,9 @@ const navItems = [
 ]
 
 export default function Sidebar() {
-  const { sidebarOpen, toggleSidebar } = useUIStore()
+  const sidebar = useUIStore((s) => s.sidebar)
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const sidebarOpen = sidebar === 'expanded'
 
   return (
     <aside

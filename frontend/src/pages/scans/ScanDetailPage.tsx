@@ -1,9 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { scansApi } from '@/api/scans'
+import { reportsApi } from '@/api/reports'
 import { useScanStore } from '@/stores/scanStore'
 import { useScanSubscription } from '@/hooks/useWebSocket'
+import { Play, FileText, Download, Loader2, CheckCircle, XCircle } from 'lucide-react'
 import type { Scan } from '@/types'
 
 type Tab = 'overview' | 'vulnerabilities' | 'logs' | 'reports'
@@ -19,6 +21,39 @@ export default function ScanDetailPage() {
   const logsEndRef = useRef<HTMLDivElement>(null)
 
   useScanSubscription(scanId)
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const startMutation = useMutation({
+    mutationFn: () => scansApi.start(scanId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan', id] })
+      queryClient.invalidateQueries({ queryKey: ['scans'] })
+    },
+  })
+
+  const [reportTitle, setReportTitle] = useState('')
+  const [reportFormats, setReportFormats] = useState<string[]>(['pdf', 'html'])
+  const [showReportForm, setShowReportForm] = useState(false)
+
+  const generateReportMutation = useMutation({
+    mutationFn: (data: { title: string; formats: string[] }) =>
+      reportsApi.generate({ scan_id: scanId, ...data }),
+    onSuccess: () => {
+      setShowReportForm(false)
+      setReportTitle('')
+      queryClient.invalidateQueries({ queryKey: ['scan-reports', id] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+    },
+  })
+
+  const { data: reportsRes } = useQuery({
+    queryKey: ['scan-reports', id],
+    queryFn: () => reportsApi.list({ scan_id: scanId }),
+    select: (res: any) => res.data,
+    enabled: !!id,
+  })
+  const scanReports = (reportsRes as any)?.items ?? []
 
   const { data: scan, isLoading } = useQuery({
     queryKey: ['scan', id],
@@ -87,15 +122,27 @@ export default function ScanDetailPage() {
           <h2 className="text-xl font-semibold">{scan.name}</h2>
           <p className="text-sm text-muted-foreground">Target ID: {scan.target_id}</p>
         </div>
-        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${
-          displayStatus === 'running' ? 'bg-blue-500/10 text-blue-500' :
-          displayStatus === 'completed' ? 'bg-green-500/10 text-green-500' :
-          displayStatus === 'error' ? 'bg-red-500/10 text-red-500' :
-          displayStatus === 'cancelled' ? 'bg-gray-500/10 text-gray-500' :
-          'bg-yellow-500/10 text-yellow-500'
-        }`}>
-          {displayStatus}
-        </span>
+        <div className="flex items-center gap-3">
+          {displayStatus === 'pending' && (
+            <button
+              onClick={() => startMutation.mutate()}
+              disabled={startMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {startMutation.isPending ? 'Starting...' : 'Start Scan'}
+            </button>
+          )}
+          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${
+            displayStatus === 'running' ? 'bg-blue-500/10 text-blue-500' :
+            displayStatus === 'completed' ? 'bg-green-500/10 text-green-500' :
+            displayStatus === 'error' ? 'bg-red-500/10 text-red-500' :
+            displayStatus === 'cancelled' ? 'bg-gray-500/10 text-gray-500' :
+            'bg-yellow-500/10 text-yellow-500'
+          }`}>
+            {displayStatus}
+          </span>
+        </div>
       </div>
 
       {(displayStatus === 'running' || displayStatus === 'pending') && (
@@ -230,8 +277,135 @@ export default function ScanDetailPage() {
         )}
 
         {activeTab === 'reports' && (
-          <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-            Report generation options will appear here.
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Reports</h3>
+              {(displayStatus === 'completed' || displayStatus === 'error') && (
+                <button
+                  onClick={() => setShowReportForm(true)}
+                  className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Generate Report
+                </button>
+              )}
+            </div>
+
+            {showReportForm && (
+              <div className="rounded-lg border bg-card p-4">
+                <h4 className="mb-3 text-sm font-medium">New Report</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium">Title</label>
+                    <input
+                      value={reportTitle}
+                      onChange={(e) => setReportTitle(e.target.value)}
+                      placeholder="e.g. Security Assessment Report"
+                      className="mt-1 flex h-9 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Formats</label>
+                    <div className="mt-1 flex gap-3">
+                      {['pdf', 'html', 'json'].map((fmt) => (
+                        <label key={fmt} className="flex items-center gap-1.5 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={reportFormats.includes(fmt)}
+                            onChange={() =>
+                              setReportFormats((prev) =>
+                                prev.includes(fmt)
+                                  ? prev.filter((f) => f !== fmt)
+                                  : [...prev, fmt]
+                              )
+                            }
+                            className="text-primary"
+                          />
+                          {fmt.toUpperCase()}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const title = reportTitle.trim() || `Report for ${scan.name}`
+                        generateReportMutation.mutate({ title, formats: reportFormats })
+                      }}
+                      disabled={generateReportMutation.isPending}
+                      className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {generateReportMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <FileText className="h-3 w-3" />
+                      )}
+                      {generateReportMutation.isPending ? 'Generating...' : 'Generate'}
+                    </button>
+                    <button
+                      onClick={() => setShowReportForm(false)}
+                      className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {generateReportMutation.error && (
+                    <p className="text-xs text-destructive">
+                      {generateReportMutation.error instanceof Error
+                        ? generateReportMutation.error.message
+                        : 'Failed to generate report'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {scanReports.length > 0 ? (
+              <div className="space-y-2">
+                {scanReports.map((r: { id: number; title: string; status: string; formats: Record<string, string>; created_at: string }) => {
+                  const completedFormats = Object.entries(r.formats ?? {})
+                    .filter(([, v]) => v === 'completed')
+                    .map(([k]) => k)
+
+                  return (
+                    <div key={r.id} className="flex items-center justify-between rounded-lg border bg-card p-3">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{r.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {r.status === 'completed' ? (
+                              <span className="flex items-center gap-1 text-green-500"><CheckCircle className="h-3 w-3" /> Completed</span>
+                            ) : r.status === 'error' ? (
+                              <span className="flex items-center gap-1 text-red-500"><XCircle className="h-3 w-3" /> Error</span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-blue-500"><Loader2 className="h-3 w-3 animate-spin" /> Generating...</span>
+                            )}
+                            {r.created_at && <> &middot; {new Date(r.created_at).toLocaleDateString()}</>}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {completedFormats.map((fmt) => (
+                          <Link
+                            key={fmt}
+                            to={`/reports/${r.id}`}
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+                          >
+                            <Download className="h-3 w-3" />
+                            {fmt.toUpperCase()}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+                No reports generated for this scan yet.
+              </div>
+            )}
           </div>
         )}
       </div>

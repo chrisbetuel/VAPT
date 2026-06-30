@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { scansApi } from '@/api/scans'
 import { targetsApi } from '@/api/targets'
+import toast from 'react-hot-toast'
 
 interface NewScanForm {
   name: string
@@ -41,9 +42,15 @@ export default function NewScanPage() {
 
   const mutation = useMutation({
     mutationFn: scansApi.create,
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       const data = (res as any)?.data ?? res
       queryClient.invalidateQueries({ queryKey: ['scans'] })
+      try {
+        await scansApi.start(data.id)
+        toast.success('Scan started')
+      } catch {
+        toast.error('Scan created but failed to auto-start')
+      }
       navigate(`/scans/${data.id}`)
     },
   })

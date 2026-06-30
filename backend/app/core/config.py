@@ -119,6 +119,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
 
+    # Reports
+    REPORTS_DIR: str = "/app/reports"
+
     # First superuser
     FIRST_SUPERUSER_EMAIL: str = "admin@vapt-platform.com"
     FIRST_SUPERUSER_PASSWORD: str = "Admin123!@#"

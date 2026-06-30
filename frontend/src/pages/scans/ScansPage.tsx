@@ -13,19 +13,20 @@ const statusColors: Record<string, string> = {
 
 export default function ScansPage() {
   const queryClient = useQueryClient()
-  const { data: scans, isLoading } = useQuery({
+  const { data: scansRes, isLoading } = useQuery({
     queryKey: ['scans'],
     queryFn: scansApi.list,
     select: (res: any) => res.data,
   })
+  const scans = (scansRes as any)?.items ?? []
 
   const startMutation = useMutation({
-    mutationFn: scansApi.start,
+    mutationFn: (id: number) => scansApi.start(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scans'] }),
   })
 
   const stopMutation = useMutation({
-    mutationFn: scansApi.stop,
+    mutationFn: (id: number) => scansApi.stop(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scans'] }),
   })
 
